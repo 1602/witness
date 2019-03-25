@@ -21,6 +21,7 @@
 package witness
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -32,7 +33,7 @@ import (
 type Broker struct {
 
 	// Events are pushed to this channel by the main events-gathering routine
-	Notifier chan []byte
+	notifier chan []byte
 
 	// New client connections
 	newClients chan chan []byte
@@ -48,10 +49,19 @@ type Broker struct {
 	firstClientConnected bool
 }
 
+func (broker *Broker) Notify(payload interface{}) {
+	json, e := json.Marshal(payload)
+	if e == nil {
+		broker.notifier <- []byte(json)
+	} else {
+		fmt.Println("Can't serialize:", e)
+	}
+}
+
 func NewServer(firstClient chan bool) (broker *Broker) {
 	// Instantiate a broker
 	broker = &Broker{
-		Notifier:             make(chan []byte, 1),
+		notifier:             make(chan []byte, 1),
 		newClients:           make(chan chan []byte),
 		closingClients:       make(chan chan []byte),
 		clients:              make(map[chan []byte]bool),
@@ -134,7 +144,7 @@ func (broker *Broker) listen() {
 			// stop sending them messages.
 			delete(broker.clients, s)
 			log.Printf("Removed client. %d registered clients", len(broker.clients))
-		case event := <-broker.Notifier:
+		case event := <-broker.notifier:
 
 			// We got a new event from the outside!
 			// Send event to all connected clients

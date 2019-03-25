@@ -1,8 +1,6 @@
 package witness
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -20,32 +18,40 @@ func (f CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 type BodyWrapper struct {
 	body             io.ReadCloser
-	ReadingStartedAt time.Time
-	Content          []byte
+	readingStartedAt time.Time
+	readingStoppedAt time.Time
+	content          []byte
+	onClose          func(*BodyWrapper)
 }
 
 func (bw *BodyWrapper) Read(p []byte) (n int, err error) {
-	now := time.Now()
-	if bw.ReadingStartedAt.IsZero() {
-		bw.ReadingStartedAt = now
+	if bw.readingStartedAt.IsZero() {
+		bw.readingStartedAt = time.Now()
+	}
+	if bw.body == nil {
+		return 0, io.EOF
 	}
 	n, err = bw.body.Read(p)
-	fmt.Println(string(p), n, err)
-	if bw.Content == nil {
-		bw.Content = p[:n]
+	// fmt.Println(string(p), n, err)
+	if bw.content == nil {
+		bw.content = p[:n]
 	} else {
-		bw.Content = append(bw.Content, p[:n]...)
+		bw.content = append(bw.content, p[:n]...)
 	}
 	if err == io.EOF {
-		fmt.Println("Read body", now.Sub(bw.ReadingStartedAt))
+		// fmt.Println("Read body", now.Sub(bw.readingStartedAt))
+		bw.readingStoppedAt = time.Now()
 		return
 	}
 	return
 }
 
 func (bw *BodyWrapper) Close() (err error) {
-	fmt.Println("Close body", time.Now().Sub(bw.ReadingStartedAt))
-	return bw.body.Close()
+	bw.onClose(bw)
+	if bw.body != nil {
+		return bw.body.Close()
+	}
+	return nil
 }
 
 type RoundTripLog struct {
@@ -59,6 +65,7 @@ type RequestLog struct {
 	Url    string
 	Query  map[string][]string
 	Header http.Header
+	Body   string
 }
 
 type ResponseLog struct {
@@ -66,6 +73,7 @@ type ResponseLog struct {
 	StatusCode    int
 	Header        http.Header
 	ContentLength int64
+	Body          string
 }
 
 type RequestTimeline struct {
@@ -86,6 +94,14 @@ func DebugClient(client *http.Client) {
 
 	log.Println("hello", <-firstClientConnected)
 
+	InstrumentClient(client, broker, true)
+}
+
+type Notifier interface {
+	Notify(interface{})
+}
+
+func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 	tr := client.Transport
 	if tr == nil {
 		tr = http.DefaultTransport
@@ -101,22 +117,30 @@ func DebugClient(client *http.Client) {
 		trace := &httptrace.ClientTrace{
 			DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
 				dnsDone = time.Now().Sub(startedAt).Nanoseconds()
-				fmt.Printf("DNS Info: %+v\n", dnsInfo)
+				// fmt.Printf("DNS Info: %+v\n", dnsInfo)
 			},
 			GotConn: func(connInfo httptrace.GotConnInfo) {
 				gotConn = time.Now().Sub(startedAt).Nanoseconds()
-				fmt.Printf("Got Conn: %+v\n", connInfo)
+				// fmt.Printf("Got Conn: %+v\n", connInfo)
 			},
 			GotFirstResponseByte: func() {
 				ttfb = time.Now().Sub(startedAt).Nanoseconds()
 			},
 		}
 		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-		fmt.Println("Request", req.URL)
+		var requestBody string
+		if includeBody {
+			req.Body = &BodyWrapper{
+				body: req.Body,
+				onClose: func(bw *BodyWrapper) {
+					requestBody = string(bw.content)
+				},
+			}
+		}
 		res, err := tr.RoundTrip(req)
 		latency := time.Now().Sub(startedAt)
-		fmt.Println("Response", res.Status, latency)
-		// res.Body = &BodyWrapper{body: res.Body}
+
+		// fmt.Println("read req body", requestBody, "okay")
 
 		payload := RoundTripLog{
 			RequestLog{
@@ -124,6 +148,7 @@ func DebugClient(client *http.Client) {
 				Url:    req.URL.String(),
 				Query:  req.URL.Query(),
 				Header: req.Header,
+				Body:   requestBody,
 			},
 			ResponseLog{
 				Status:        string(res.Status),
@@ -140,8 +165,18 @@ func DebugClient(client *http.Client) {
 				LatencyNano: latency.Nanoseconds(),
 			},
 		}
-		json, err := json.Marshal(payload)
-		broker.Notifier <- []byte(json)
+
+		if includeBody {
+			res.Body = &BodyWrapper{
+				body: res.Body,
+				onClose: func(bw *BodyWrapper) {
+					payload.ResponseLog.Body = string(bw.content)
+					n.Notify(payload)
+				},
+			}
+		} else {
+			n.Notify(payload)
+		}
 		return res, err
 	})
 }
