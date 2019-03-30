@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
-// uncomment this for manual testing using frontend inspector cliend
-//*
+// uncomment this for manual testing using frontend inspector client
+/*
 func TestHttpObserver(t *testing.T) {
 	client := &http.Client{}
 	DebugClient(client)
@@ -40,10 +38,10 @@ func TestHttpObserver(t *testing.T) {
 //*/
 
 type fakeNotifier struct {
-	payload interface{}
+	payload RoundTripLog
 }
 
-func (n *fakeNotifier) Notify(p interface{}) {
+func (n *fakeNotifier) Notify(p RoundTripLog) {
 	n.payload = p
 }
 
@@ -69,11 +67,7 @@ func TestInstrumentClient(t *testing.T) {
 	api := API{client, testServer.URL}
 	api.SendPostRequest()
 
-	payload, ok := notifier.payload.(RoundTripLog)
-	if !ok {
-		t.Error("Unknown payload")
-		t.FailNow()
-	}
+	payload := notifier.payload
 
 	reqBody := "hello"
 	if payload.RequestLog.Body != reqBody {

@@ -9,7 +9,7 @@ import (
 
 type customTransport func(req *http.Request) (*http.Response, error)
 
-func (f customTransport) roundTrip(req *http.Request) (*http.Response, error) {
+func (f customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
@@ -46,18 +46,18 @@ type RequestTimeline struct {
 
 func DebugClient(client *http.Client) {
 	firstClientConnected := make(chan bool, 1)
-	broker := NewServer(firstClientConnected)
+	n := NewTransport(firstClientConnected)
 	go (func() {
-		log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", broker))
+		// log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", notifier))
 	})()
 
 	log.Println("hello", <-firstClientConnected)
 
-	InstrumentClient(client, broker, true)
+	InstrumentClient(client, n, true)
 }
 
 type Notifier interface {
-	Notify(interface{})
+	Notify(RoundTripLog)
 }
 
 func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
@@ -66,7 +66,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 		tr = http.DefaultTransport
 	}
 
-	client.Transport = CustomTransport(func(req *http.Request) (*http.Response, error) {
+	client.Transport = customTransport(func(req *http.Request) (*http.Response, error) {
 		var (
 			dnsDone int64
 			gotConn int64
