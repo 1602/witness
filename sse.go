@@ -30,7 +30,7 @@ import (
 // Example SSE server in Golang.
 //     $ go run sse.go
 
-type Broker struct {
+type broker struct {
 
 	// Events are pushed to this channel by the main events-gathering routine
 	notifier chan []byte
@@ -49,7 +49,7 @@ type Broker struct {
 	firstClientConnected bool
 }
 
-func (broker *Broker) Notify(payload interface{}) {
+func (broker *broker) Notify(payload interface{}) {
 	json, e := json.Marshal(payload)
 	if e == nil {
 		broker.notifier <- []byte(json)
@@ -58,9 +58,9 @@ func (broker *Broker) Notify(payload interface{}) {
 	}
 }
 
-func NewServer(firstClient chan bool) (broker *Broker) {
+func NewServer(firstClient chan bool) (broker *broker) {
 	// Instantiate a broker
-	broker = &Broker{
+	broker = &broker{
 		notifier:             make(chan []byte, 1),
 		newClients:           make(chan chan []byte),
 		closingClients:       make(chan chan []byte),
@@ -75,7 +75,7 @@ func NewServer(firstClient chan bool) (broker *Broker) {
 	return
 }
 
-func (broker *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (broker *broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	// Make sure that the writer supports flushing.
 	//
@@ -91,7 +91,7 @@ func (broker *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Connection", "keep-alive")
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
 
-	// Each connection registers its own message channel with the Broker's connections registry
+	// Each connection registers its own message channel with the broker's connections registry
 	messageChan := make(chan []byte)
 
 	if !broker.firstClientConnected {
@@ -129,7 +129,7 @@ func (broker *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 }
 
-func (broker *Broker) listen() {
+func (broker *broker) listen() {
 	for {
 		select {
 		case s := <-broker.newClients:
