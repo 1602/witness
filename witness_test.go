@@ -111,6 +111,9 @@ func (api *API) SendPostRequest() ([]byte, error) {
 
 func (api *API) CheckStatus() ([]byte, error) {
 	req, err := http.NewRequest("GET", api.baseURL+"/status?a=2&foo=bar&foo=baz", nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("user-agent", "Go test-runner, v1")
 	resp, err := api.Client.Do(req)
 	if err != nil {
