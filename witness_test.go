@@ -97,14 +97,16 @@ type API struct {
 
 func (api *API) SendPostRequest() ([]byte, error) {
 	req, err := http.NewRequest("POST", api.baseURL+"/status?a=2&foo=bar&foo=baz", bytes.NewBuffer([]byte("hello")))
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("user-agent", "Go test-runner, v1")
 	resp, err := api.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	return body, err
+	return ioutil.ReadAll(resp.Body)
 }
 
 func (api *API) CheckStatus() ([]byte, error) {
