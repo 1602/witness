@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// BodyWrapper implements ReadCloser interface to wrap a body to spy on events.
 type BodyWrapper struct {
 	body             io.ReadCloser
 	readingStartedAt time.Time
@@ -13,6 +14,7 @@ type BodyWrapper struct {
 	onClose          func(*BodyWrapper)
 }
 
+// Read performs real read operation tracking time until completion.
 func (bw *BodyWrapper) Read(p []byte) (n int, err error) {
 	if bw.readingStartedAt.IsZero() {
 		bw.readingStartedAt = time.Now()
@@ -35,6 +37,7 @@ func (bw *BodyWrapper) Read(p []byte) (n int, err error) {
 	return
 }
 
+// Close calls real body.Close and invokes internal callback to track time to closing.
 func (bw *BodyWrapper) Close() (err error) {
 	bw.onClose(bw)
 	if bw.body != nil {
