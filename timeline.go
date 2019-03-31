@@ -49,8 +49,8 @@ func (tl *Timeline) tracer() *httptrace.ClientTrace {
 
 		Got1xxResponse: func(code int, header textproto.MIMEHeader) error {
 			tl.logEvent("Got1xxResponse", struct {
-				code   int
-				header textproto.MIMEHeader
+				Code   int                  `json:"code"`
+				Header textproto.MIMEHeader `json:"header"`
 			}{code, header})
 			return nil
 		},
@@ -65,16 +65,16 @@ func (tl *Timeline) tracer() *httptrace.ClientTrace {
 
 		ConnectStart: func(network, addr string) {
 			tl.logEvent("ConnectStart", struct {
-				network string
-				addr    string
+				Network string `json:"network"`
+				Addr    string `json:"addr"`
 			}{network, addr})
 		},
 
 		ConnectDone: func(network, addr string, err error) {
 			tl.logEvent("ConnectDone", struct {
-				network string
-				addr    string
-				err     error
+				Network string `json:"network"`
+				Addr    string `json:"addr"`
+				Err     error  `json:"err"`
 			}{network, addr, err})
 		},
 
@@ -89,7 +89,10 @@ func (tl *Timeline) tracer() *httptrace.ClientTrace {
 		},
 
 		WroteHeaderField: func(key string, value []string) {
-			tl.logEvent("WroteHeaderField", key)
+			tl.logEvent("WroteHeaderField", struct {
+				Key   string   `json:"key"`
+				Value []string `json:"value"`
+			}{key, value})
 		},
 
 		WroteHeaders: func() {
