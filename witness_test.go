@@ -30,11 +30,11 @@ func TestIntegration(t *testing.T) {
 	defer testServer.Close()
 	api := API{client, "https://api.automationcloud.net"}
 	// api := API{client, testServer.URL}
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 3; i++ {
 		// for {
 		api.CheckStatus()
 		log.Println("ping")
-		time.Sleep(10 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 
 }
