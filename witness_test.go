@@ -6,18 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // uncomment this for manual testing using frontend inspector client
-/*
-func TestDebugClient(t *testing.T) {
+//*
+func TestIntegration(t *testing.T) {
 	client := &http.Client{}
-	fmt.Println("haha")
-	DebugClient(client)
-	fmt.Println("hoho")
+	DebugClient(client, context.Background())
 	testServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			m := make(map[string]string)
