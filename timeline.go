@@ -21,7 +21,7 @@ type Event struct {
 func newTimeline(startedAt time.Time) *Timeline {
 	return &Timeline{
 		StartedAt: startedAt,
-		Events:    make([]Event, 0, 8),
+		Events:    make([]Event, 0, 25),
 	}
 }
 
