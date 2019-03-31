@@ -2,22 +2,25 @@ package witness
 
 import (
 	"io"
-	"time"
 )
 
 // BodyWrapper implements ReadCloser interface to wrap a body to spy on events.
 type BodyWrapper struct {
-	body             io.ReadCloser
-	readingStartedAt time.Time
-	readingStoppedAt time.Time
-	content          []byte
-	onClose          func(*BodyWrapper)
+	body           io.ReadCloser
+	readingStarted bool
+	content        []byte
+	onReadingStart func()
+	onReadingDone  func()
+	onClose        func(*BodyWrapper)
 }
 
 // Read performs real read operation tracking time until completion.
 func (bw *BodyWrapper) Read(p []byte) (n int, err error) {
-	if bw.readingStartedAt.IsZero() {
-		bw.readingStartedAt = time.Now()
+	if !bw.readingStarted {
+		bw.readingStarted = true
+		if bw.onReadingStart != nil {
+			bw.onReadingStart()
+		}
 	}
 	if bw.body == nil {
 		return 0, io.EOF
@@ -31,7 +34,9 @@ func (bw *BodyWrapper) Read(p []byte) (n int, err error) {
 	}
 	if err == io.EOF {
 		// fmt.Println("Read body", now.Sub(bw.readingStartedAt))
-		bw.readingStoppedAt = time.Now()
+		if bw.onReadingDone != nil {
+			bw.onReadingDone()
+		}
 		return
 	}
 	return

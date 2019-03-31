@@ -16,7 +16,7 @@ func (f customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 type RoundTripLog struct {
 	RequestLog  RequestLog
 	ResponseLog ResponseLog
-	Timeline    RequestTimeline
+	Timeline    *Timeline
 }
 
 type RequestLog struct {
@@ -33,31 +33,29 @@ type ResponseLog struct {
 	Header        http.Header
 	ContentLength int64
 	Body          string
+	Latency       string
+	LatencyNano   int64
 }
 
-type RequestTimeline struct {
-	StartedAt   time.Time
-	DnsDone     int64
-	GotConn     int64
-	Ttfb        int64
-	Latency     string
-	LatencyNano int64
+// Notifier interface must be implemented by a transport.
+type Notifier interface {
+	Notify(RoundTripLog)
 }
 
 func DebugClient(client *http.Client) {
 	firstClientConnected := make(chan bool, 1)
-	n := NewTransport(firstClientConnected)
+	n := NewTransport(firstClientConnected, nil)
+
 	go (func() {
-		// log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", notifier))
+		// TODO: make configurable
+		log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", n))
 	})()
 
-	log.Println("hello", <-firstClientConnected)
+	// TODO: make configurable
+	// wait until first client connected
+	<-firstClientConnected
 
 	InstrumentClient(client, n, true)
-}
-
-type Notifier interface {
-	Notify(RoundTripLog)
 }
 
 func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
@@ -67,31 +65,22 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 	}
 
 	client.Transport = customTransport(func(req *http.Request) (*http.Response, error) {
-		var (
-			dnsDone int64
-			gotConn int64
-			ttfb    int64
-		)
 		startedAt := time.Now()
-		trace := &httptrace.ClientTrace{
-			DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
-				dnsDone = time.Now().Sub(startedAt).Nanoseconds()
-				// fmt.Printf("DNS Info: %+v\n", dnsInfo)
-			},
-			GotConn: func(connInfo httptrace.GotConnInfo) {
-				gotConn = time.Now().Sub(startedAt).Nanoseconds()
-				// fmt.Printf("Got Conn: %+v\n", connInfo)
-			},
-			GotFirstResponseByte: func() {
-				ttfb = time.Now().Sub(startedAt).Nanoseconds()
-			},
-		}
+		timeline := newTimeline(startedAt)
+		trace := timeline.tracer()
 		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 		var requestBody string
 		if includeBody {
 			req.Body = &BodyWrapper{
 				body: req.Body,
+				onReadingStart: func() {
+					timeline.logEvent("RequestBodyReadingStart", nil)
+				},
+				onReadingDone: func() {
+					timeline.logEvent("RequestBodyReadingDone", nil)
+				},
 				onClose: func(bw *BodyWrapper) {
+					timeline.logEvent("RequestBodyClosed", nil)
 					requestBody = string(bw.content)
 				},
 			}
@@ -114,21 +103,23 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				StatusCode:    res.StatusCode,
 				Header:        res.Header,
 				ContentLength: res.ContentLength,
+				Latency:       latency.String(),
+				LatencyNano:   latency.Nanoseconds(),
 			},
-			RequestTimeline{
-				StartedAt:   startedAt,
-				DnsDone:     dnsDone,
-				GotConn:     gotConn,
-				Ttfb:        ttfb,
-				Latency:     latency.String(),
-				LatencyNano: latency.Nanoseconds(),
-			},
+			timeline,
 		}
 
 		if includeBody {
 			res.Body = &BodyWrapper{
 				body: res.Body,
+				onReadingStart: func() {
+					timeline.logEvent("ResponseBodyReadingStart", nil)
+				},
+				onReadingDone: func() {
+					timeline.logEvent("ResponseBodyReadingDone", nil)
+				},
 				onClose: func(bw *BodyWrapper) {
+					timeline.logEvent("ResponseBodyClosed", nil)
 					payload.ResponseLog.Body = string(bw.content)
 					n.Notify(payload)
 				},
