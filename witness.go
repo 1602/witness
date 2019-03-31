@@ -62,6 +62,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 		trace := timeline.tracer()
 		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 		var requestBody string
+		var latency time.Duration
 		if includeBody {
 			req.Body = &BodyWrapper{
 				body: req.Body,
@@ -78,11 +79,10 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 			}
 		}
 		res, err := tr.RoundTrip(req)
-		latency := time.Now().Sub(startedAt)
 
 		// fmt.Println("read req body", requestBody, "okay")
 
-		payload := RoundTripLog{
+		payload := &RoundTripLog{
 			RequestLog{
 				Method: req.Method,
 				Url:    req.URL.String(),
@@ -95,8 +95,6 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				StatusCode:    res.StatusCode,
 				Header:        res.Header,
 				ContentLength: res.ContentLength,
-				Latency:       latency.String(),
-				LatencyNano:   latency.Nanoseconds(),
 			},
 			timeline,
 		}
@@ -113,11 +111,17 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				onClose: func(bw *BodyWrapper) {
 					timeline.logEvent("ResponseBodyClosed", nil)
 					payload.ResponseLog.Body = string(bw.content)
-					n.Notify(payload)
+					latency = time.Now().Sub(startedAt)
+					payload.ResponseLog.Latency = latency.String()
+					payload.ResponseLog.LatencyNano = latency.Nanoseconds()
+					n.Notify(*payload)
 				},
 			}
 		} else {
-			n.Notify(payload)
+			latency = time.Now().Sub(startedAt)
+			payload.ResponseLog.Latency = latency.String()
+			payload.ResponseLog.LatencyNano = latency.Nanoseconds()
+			n.Notify(*payload)
 		}
 		return res, err
 	})
