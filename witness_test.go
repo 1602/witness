@@ -2,18 +2,17 @@ package witness
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
 // uncomment this for manual testing using frontend inspector client
-//*
+/*
 func TestDebugClient(t *testing.T) {
 	client := &http.Client{}
 	fmt.Println("haha")
@@ -44,10 +43,25 @@ func TestDebugClient(t *testing.T) {
 
 type fakeNotifier struct {
 	payload RoundTripLog
+	ctx     context.Context
+}
+
+func (n *fakeNotifier) Init(ctx context.Context) {
+	n.ctx = ctx
 }
 
 func (n *fakeNotifier) Notify(p RoundTripLog) {
 	n.payload = p
+}
+
+func TestDebugClient(t *testing.T) {
+	client := &http.Client{}
+	dtStashed := DefaultTransport
+	defer func() {
+		DefaultTransport = dtStashed
+	}()
+	DefaultTransport = &fakeNotifier{}
+	DebugClient(client, context.Background())
 }
 
 func TestInstrumentClient(t *testing.T) {

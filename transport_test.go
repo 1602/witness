@@ -1,6 +1,8 @@
 package witness
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +13,7 @@ import (
 
 func TestNotify(t *testing.T) {
 	url := "http://example.com"
-	tr := NewTransport(nil, nil)
+	tr := NewSSETransport()
 	go tr.Notify(RoundTripLog{RequestLog: RequestLog{Url: url}})
 	msg := <-tr.distributor
 	if !strings.Contains(string(msg), url) {
@@ -41,37 +43,44 @@ func TestSerializeOrDie(t *testing.T) {
 
 func TestServeHTTP(t *testing.T) {
 	t.Run("waiting for the first client", func(t *testing.T) {
-		done := make(chan bool, 1)
-		ch := make(chan bool, 1)
-		tr := NewTransport(ch, done)
-		ts := httptest.NewServer(tr)
+		tr := NewSSETransport()
+		ts := httptest.NewUnstartedServer(tr)
 		defer ts.Close()
+		ctx, cancel := context.WithCancel(context.TODO())
+		tr.startServer = func() {
+			ts.Start()
 
-		go func() {
-			req, _ := http.NewRequest("GET", ts.URL, nil)
-			client := &http.Client{Timeout: 10 * time.Millisecond}
-			res, _ := client.Do(req)
-			l, _ := ioutil.ReadAll(res.Body)
-			res.Body.Close()
-			result := string(l)
+			go func() {
+				req, _ := http.NewRequest("GET", ts.URL, nil)
+				fmt.Println("server url is", ts.URL)
+				client := &http.Client{Timeout: 10 * time.Millisecond}
+				res, err := client.Do(req)
+				if err != nil {
+					fmt.Println(res, err)
+				}
+				l, _ := ioutil.ReadAll(res.Body)
+				res.Body.Close()
+				result := string(l)
 
-			if !strings.HasPrefix(result, "data:") {
-				t.Errorf("expected body to have prefix 'data:', got %s", result)
-			}
+				if !strings.HasPrefix(result, "data:") {
+					t.Errorf("expected body to have prefix 'data:', got %s", result)
+				}
 
-			if !strings.Contains(result, "example.com") {
-				t.Errorf("expected body to contain 'example.com', got %s", result)
-			}
+				if !strings.Contains(result, "example.com") {
+					t.Errorf("expected body to contain 'example.com', got %s", result)
+				}
 
-			done <- true
-		}()
-		<-ch
+				cancel()
+			}()
+		}
+
+		tr.Init(ctx)
 		tr.Notify(RoundTripLog{RequestLog: RequestLog{Url: "http://example.com"}})
 	})
 
 	t.Run("flusher not supported", func(t *testing.T) {
 		xx := &x{make(map[string][]string), 0, ""}
-		tr := NewTransport(nil, nil)
+		tr := NewSSETransport()
 		req, _ := http.NewRequest("GET", "http://example.com", nil)
 		tr.ServeHTTP(xx, req)
 		if xx.statusCode != 500 {

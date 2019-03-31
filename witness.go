@@ -1,7 +1,7 @@
 package witness
 
 import (
-	"log"
+	"context"
 	"net/http"
 	"net/http/httptrace"
 	"time"
@@ -39,23 +39,15 @@ type ResponseLog struct {
 
 // Notifier interface must be implemented by a transport.
 type Notifier interface {
+	Init(context.Context)
 	Notify(RoundTripLog)
 }
 
-func DebugClient(client *http.Client) {
-	firstClientConnected := make(chan bool, 1)
-	n := NewTransport(firstClientConnected, nil)
+var DefaultTransport Notifier = NewSSETransport()
 
-	go (func() {
-		// TODO: make configurable
-		log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", n))
-	})()
-
-	// TODO: make configurable
-	// wait until first client connected
-	<-firstClientConnected
-
-	InstrumentClient(client, n, true)
+func DebugClient(client *http.Client, ctx context.Context) {
+	DefaultTransport.Init(ctx)
+	InstrumentClient(client, DefaultTransport, true)
 }
 
 func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {

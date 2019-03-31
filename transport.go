@@ -1,8 +1,10 @@
 package witness
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -13,7 +15,8 @@ type sse struct {
 	closingClients       chan chan []byte
 	firstClient          chan bool
 	firstClientConnected bool
-	done                 chan bool
+	ctx                  context.Context
+	startServer          func()
 }
 
 func (t *sse) Notify(rtl RoundTripLog) {
@@ -29,20 +32,34 @@ func serializeOrDie(stuff interface{}) []byte {
 	return json
 }
 
-func NewTransport(firstClientReady, done chan bool) (transport *sse) {
+func NewSSETransport() (transport *sse) {
 	transport = &sse{
 		distributor:          make(chan []byte),
 		openingClients:       make(chan chan []byte),
 		connectedClients:     make(map[chan []byte]bool),
 		closingClients:       make(chan chan []byte),
-		firstClient:          firstClientReady,
 		firstClientConnected: false,
-		done:                 done,
+		startServer: func() {
+			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", transport))
+		},
 	}
 
-	go transport.route()
-
 	return transport
+}
+
+func (t *sse) Init(ctx context.Context) {
+	t.ctx = ctx
+	t.firstClient = make(chan bool, 1)
+	go t.route()
+	go t.startServer()
+
+	// TODO: make configurable
+	// wait until first client connected
+	fmt.Println("waiting for first client")
+
+	<-t.firstClient
+
+	fmt.Println("first client connected")
 }
 
 func (t *sse) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -83,7 +100,7 @@ func (t *sse) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		case data := <-ch:
 			fmt.Fprintf(rw, "data: %s\n\n", data)
 			flusher.Flush()
-		case <-t.done:
+		case <-t.ctx.Done():
 			return
 		}
 	}
