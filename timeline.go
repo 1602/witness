@@ -115,7 +115,7 @@ func (tl *Timeline) logEvent(name string, payload interface{}) {
 		Event{
 			name,
 			payload,
-			time.Now().Sub(tl.StartedAt).Nanoseconds() / 100000,
+			time.Now().Sub(tl.StartedAt).Nanoseconds(),
 		},
 	)
 }
