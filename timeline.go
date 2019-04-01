@@ -104,7 +104,7 @@ func (tl *Timeline) tracer() *httptrace.ClientTrace {
 		},
 
 		WroteRequest: func(i httptrace.WroteRequestInfo) {
-			tl.logEvent("WroteRequestInfo", i)
+			tl.logEvent("WroteRequest", i)
 		},
 	}
 }

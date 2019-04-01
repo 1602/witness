@@ -6,7 +6,7 @@ import (
 )
 
 func TestBodyWrapperRead(t *testing.T) {
-	bw := &BodyWrapper{body: nil}
+	bw := &bodyWrapper{body: nil}
 	var p []byte
 	_, err := bw.Read(p)
 	if err != io.EOF {
@@ -15,7 +15,7 @@ func TestBodyWrapperRead(t *testing.T) {
 }
 
 func TestBodyWrapperClose(t *testing.T) {
-	bw := &BodyWrapper{body: nil, onClose: func(bw *BodyWrapper) {}}
+	bw := &bodyWrapper{body: nil, onClose: func(bw *bodyWrapper) {}}
 	err := bw.Close()
 	if err != nil {
 		t.Error(err)

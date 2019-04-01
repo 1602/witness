@@ -4,18 +4,18 @@ import (
 	"io"
 )
 
-// BodyWrapper implements ReadCloser interface to wrap a body to spy on events.
-type BodyWrapper struct {
+// bodyWrapper implements ReadCloser interface to wrap a body to spy on events.
+type bodyWrapper struct {
 	body           io.ReadCloser
 	readingStarted bool
 	content        []byte
 	onReadingStart func()
 	onReadingDone  func()
-	onClose        func(*BodyWrapper)
+	onClose        func(*bodyWrapper)
 }
 
 // Read performs real read operation tracking time until completion.
-func (bw *BodyWrapper) Read(p []byte) (n int, err error) {
+func (bw *bodyWrapper) Read(p []byte) (n int, err error) {
 	if !bw.readingStarted {
 		bw.readingStarted = true
 		if bw.onReadingStart != nil {
@@ -43,7 +43,7 @@ func (bw *BodyWrapper) Read(p []byte) (n int, err error) {
 }
 
 // Close calls real body.Close and invokes internal callback to track time to closing.
-func (bw *BodyWrapper) Close() (err error) {
+func (bw *bodyWrapper) Close() (err error) {
 	bw.onClose(bw)
 	if bw.body != nil {
 		return bw.body.Close()

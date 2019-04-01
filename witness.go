@@ -14,27 +14,27 @@ func (f customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 type RoundTripLog struct {
-	RequestLog  RequestLog
-	ResponseLog ResponseLog
-	Timeline    *Timeline
+	RequestLog  RequestLog  `json:"requestLog"`
+	ResponseLog ResponseLog `json:"responseLog"`
+	Timeline    *Timeline   `json:"timeline"`
 }
 
 type RequestLog struct {
-	Method string
-	Url    string
-	Query  map[string][]string
-	Header http.Header
-	Body   string
+	Method string              `json:"method"`
+	Url    string              `json:"url"`
+	Query  map[string][]string `json:"query"`
+	Header http.Header         `json:"header"`
+	Body   string              `json:"body"`
 }
 
 type ResponseLog struct {
-	Status        string
-	StatusCode    int
-	Header        http.Header
-	ContentLength int64
-	Body          string
-	Latency       string
-	LatencyNano   int64
+	Status        string      `json:"status"`
+	StatusCode    int         `json:"statusCode"`
+	Header        http.Header `json:"header"`
+	ContentLength int64       `json:"contentLength"`
+	Body          string      `json:"body"`
+	Latency       string      `json:"latency"`
+	LatencyNano   int64       `json:"latencyNano"`
 }
 
 // Notifier interface must be implemented by a transport.
@@ -64,7 +64,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 		var requestBody string
 		var latency time.Duration
 		if includeBody {
-			req.Body = &BodyWrapper{
+			req.Body = &bodyWrapper{
 				body: req.Body,
 				onReadingStart: func() {
 					timeline.logEvent("RequestBodyReadingStart", nil)
@@ -72,7 +72,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				onReadingDone: func() {
 					timeline.logEvent("RequestBodyReadingDone", nil)
 				},
-				onClose: func(bw *BodyWrapper) {
+				onClose: func(bw *bodyWrapper) {
 					timeline.logEvent("RequestBodyClosed", nil)
 					requestBody = string(bw.content)
 				},
@@ -100,7 +100,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 		}
 
 		if includeBody {
-			res.Body = &BodyWrapper{
+			res.Body = &bodyWrapper{
 				body: res.Body,
 				onReadingStart: func() {
 					timeline.logEvent("ResponseBodyReadingStart", nil)
@@ -108,7 +108,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				onReadingDone: func() {
 					timeline.logEvent("ResponseBodyReadingDone", nil)
 				},
-				onClose: func(bw *BodyWrapper) {
+				onClose: func(bw *bodyWrapper) {
 					timeline.logEvent("ResponseBodyClosed", nil)
 					payload.ResponseLog.Body = string(bw.content)
 					latency = time.Now().Sub(startedAt)
