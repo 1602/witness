@@ -43,11 +43,11 @@ type Notifier interface {
 	Notify(RoundTripLog)
 }
 
-var DefaultTransport Notifier = NewSSETransport()
+var DefaultNotifier Notifier = NewSSENotifier()
 
 func DebugClient(client *http.Client, ctx context.Context) {
-	DefaultTransport.Init(ctx)
-	InstrumentClient(client, DefaultTransport, true)
+	DefaultNotifier.Init(ctx)
+	InstrumentClient(client, DefaultNotifier, true)
 }
 
 func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {

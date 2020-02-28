@@ -32,7 +32,7 @@ func serializeOrDie(stuff interface{}) []byte {
 	return json
 }
 
-func NewSSETransport() (transport *sse) {
+func NewSSENotifier() (transport *sse) {
 	transport = &sse{
 		distributor:          make(chan []byte),
 		openingClients:       make(chan chan []byte),
