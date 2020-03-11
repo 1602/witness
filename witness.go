@@ -80,24 +80,23 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 		}
 		res, err := tr.RoundTrip(req)
 
-		// fmt.Println("read req body", requestBody, "okay")
-
-		payload := &RoundTripLog{
-			RequestLog{
-				Method: req.Method,
-				Url:    req.URL.String(),
-				Query:  req.URL.Query(),
-				Header: req.Header,
-				Body:   requestBody,
-			},
-			ResponseLog{
-				Status:        string(res.Status),
-				StatusCode:    res.StatusCode,
-				Header:        res.Header,
-				ContentLength: res.ContentLength,
-			},
-			timeline,
+		requestLog := RequestLog{
+			Method: req.Method,
+			Url:    req.URL.String(),
+			Query:  req.URL.Query(),
+			Header: req.Header,
+			Body:   requestBody,
 		}
+
+		responseLog := ResponseLog{}
+		if res != nil {
+			responseLog.Status = string(res.Status)
+			responseLog.StatusCode = res.StatusCode
+			responseLog.Header = res.Header
+			responseLog.ContentLength = res.ContentLength
+		}
+
+		payload := &RoundTripLog{requestLog, responseLog, timeline}
 
 		if includeBody {
 			res.Body = &bodyWrapper{
