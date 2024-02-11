@@ -4,7 +4,7 @@
 
 ## Witness
 
-Enables debugging of http requests via UI.
+Enables debugging of http requests via UI. It is like chrome devtools for go backend.
 
 ## How it works
 
