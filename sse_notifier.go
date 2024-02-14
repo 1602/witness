@@ -40,7 +40,7 @@ func NewSSENotifier() (transport *sse) {
 		closingClients:       make(chan chan []byte),
 		firstClientConnected: false,
 		startServer: func() {
-			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", transport))
+			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:8989", transport))
 		},
 	}
 
@@ -55,7 +55,7 @@ func (t *sse) Init(ctx context.Context) {
 
 	// TODO: make configurable
 	// wait until first client connected
-	fmt.Println("waiting for first client")
+	fmt.Println("waiting for the first client")
 
 	<-t.firstClient
 
@@ -98,6 +98,7 @@ func (t *sse) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for {
 		select {
 		case data := <-ch:
+			fmt.Printf("sending %d bytes of data\n", len(data))
 			fmt.Fprintf(rw, "data: %s\n\n", data)
 			flusher.Flush()
 		case <-t.ctx.Done():
@@ -110,6 +111,7 @@ func (t *sse) route() {
 	for {
 		select {
 		case s := <-t.openingClients:
+			fmt.Println("new client connected")
 			t.connectedClients[s] = true
 		case event := <-t.distributor:
 			for c := range t.connectedClients {

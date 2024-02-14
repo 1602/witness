@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type customTransport func(req *http.Request) (*http.Response, error)
@@ -14,9 +16,19 @@ func (f customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 type RoundTripLog struct {
-	RequestLog  RequestLog  `json:"requestLog"`
-	ResponseLog ResponseLog `json:"responseLog"`
-	Timeline    *Timeline   `json:"timeline"`
+	ID           string        `json:"id"`
+	RequestLog   *RequestLog   `json:"requestLog"`
+	ResponseLog  *ResponseLog  `json:"responseLog"`
+	Error        *RequestError `json:"error"`
+	Timeline     *Timeline     `json:"timeline"`
+	Duration     string        `json:"duration"`
+	DurationNano int64         `json:"durationNano"`
+	Done         bool          `json:"done"`
+}
+
+type RequestError struct {
+	Message string `json:"message"`
+	Details error  `json:"details"`
 }
 
 type RequestLog struct {
@@ -33,8 +45,6 @@ type ResponseLog struct {
 	Header        http.Header `json:"header"`
 	ContentLength int64       `json:"contentLength"`
 	Body          string      `json:"body"`
-	Latency       string      `json:"latency"`
-	LatencyNano   int64       `json:"latencyNano"`
 }
 
 // Notifier interface must be implemented by a transport.
@@ -57,12 +67,28 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 	}
 
 	client.Transport = customTransport(func(req *http.Request) (*http.Response, error) {
-		startedAt := time.Now()
-		timeline := newTimeline(startedAt)
-		trace := timeline.tracer()
-		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 		var requestBody string
-		var latency time.Duration
+		startedAt := time.Now()
+		id := uuid.NewString()
+		timeline := newTimeline(startedAt)
+		requestLog := &RequestLog{
+			Method: req.Method,
+			Url:    req.URL.String(),
+			Query:  req.URL.Query(),
+			Header: req.Header,
+			Body:   requestBody,
+		}
+		payload := &RoundTripLog{
+			ID:         id,
+			RequestLog: requestLog,
+			Timeline:   timeline,
+		}
+		trace := timeline.tracer(func() {
+			n.Notify(*payload)
+		})
+		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+
+		var duration time.Duration
 		if includeBody {
 			req.Body = &bodyWrapper{
 				body: req.Body,
@@ -78,27 +104,26 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				},
 			}
 		}
+
 		res, err := tr.RoundTrip(req)
 
-		requestLog := RequestLog{
-			Method: req.Method,
-			Url:    req.URL.String(),
-			Query:  req.URL.Query(),
-			Header: req.Header,
-			Body:   requestBody,
-		}
-
-		responseLog := ResponseLog{}
 		if res != nil {
-			responseLog.Status = string(res.Status)
-			responseLog.StatusCode = res.StatusCode
-			responseLog.Header = res.Header
-			responseLog.ContentLength = res.ContentLength
+			payload.ResponseLog = &ResponseLog{
+				Status:        string(res.Status),
+				StatusCode:    res.StatusCode,
+				Header:        res.Header,
+				ContentLength: res.ContentLength,
+			}
 		}
 
-		payload := &RoundTripLog{requestLog, responseLog, timeline}
+		if err != nil {
+			payload.Error = &RequestError{
+				Message: err.Error(),
+				Details: err,
+			}
+		}
 
-		if includeBody {
+		if includeBody && res != nil && res.Body != nil {
 			res.Body = &bodyWrapper{
 				body: res.Body,
 				onReadingStart: func() {
@@ -109,19 +134,41 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				},
 				onClose: func(bw *bodyWrapper) {
 					timeline.logEvent("ResponseBodyClosed", nil)
-					payload.ResponseLog.Body = string(bw.content)
-					latency = time.Now().Sub(startedAt)
-					payload.ResponseLog.Latency = latency.String()
-					payload.ResponseLog.LatencyNano = latency.Nanoseconds()
+					duration = time.Now().Sub(startedAt)
+					payload.Done = true
+					if payload.ResponseLog != nil {
+						payload.ResponseLog.Body = string(bw.content)
+						if payload.ResponseLog.ContentLength == -1 {
+							payload.ResponseLog.ContentLength = int64(len(bw.content))
+						}
+					}
+					payload.Duration = roundDuration(duration, 1).String()
+					payload.DurationNano = duration.Nanoseconds()
 					n.Notify(*payload)
 				},
 			}
 		} else {
-			latency = time.Now().Sub(startedAt)
-			payload.ResponseLog.Latency = latency.String()
-			payload.ResponseLog.LatencyNano = latency.Nanoseconds()
+			duration = time.Now().Sub(startedAt)
+			payload.Done = true
+			payload.Duration = roundDuration(duration, 1).String()
+			payload.DurationNano = duration.Nanoseconds()
 			n.Notify(*payload)
 		}
 		return res, err
 	})
+}
+
+var divs = []time.Duration{
+	time.Duration(1), time.Duration(10), time.Duration(100), time.Duration(1000)}
+
+func roundDuration(d time.Duration, digits int) time.Duration {
+	switch {
+	case d > time.Second:
+		d = d.Round(time.Second / divs[digits])
+	case d > time.Millisecond:
+		d = d.Round(time.Millisecond / divs[digits])
+	case d > time.Microsecond:
+		d = d.Round(time.Microsecond / divs[digits])
+	}
+	return d
 }

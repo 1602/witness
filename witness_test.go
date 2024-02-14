@@ -6,13 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // uncomment this for manual testing using frontend inspector client
-/*
+//*
 func TestIntegration(t *testing.T) {
 	client := &http.Client{}
 	DebugClient(client, context.Background())
@@ -54,11 +56,11 @@ func (n *fakeNotifier) Notify(p RoundTripLog) {
 
 func TestDebugClient(t *testing.T) {
 	client := &http.Client{}
-	dtStashed := DefaultTransport
+	dtStashed := DefaultNotifier
 	defer func() {
-		DefaultTransport = dtStashed
+		DefaultNotifier = dtStashed
 	}()
-	DefaultTransport = &fakeNotifier{}
+	DefaultNotifier = &fakeNotifier{}
 	DebugClient(client, context.Background())
 }
 

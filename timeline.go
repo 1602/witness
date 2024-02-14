@@ -25,7 +25,7 @@ func newTimeline(startedAt time.Time) *Timeline {
 	}
 }
 
-func (tl *Timeline) tracer() *httptrace.ClientTrace {
+func (tl *Timeline) tracer(flush func()) *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
 		GetConn: func(hostPort string) {
 			tl.logEvent("GetConn", hostPort)
@@ -33,6 +33,7 @@ func (tl *Timeline) tracer() *httptrace.ClientTrace {
 
 		GotConn: func(connInfo httptrace.GotConnInfo) {
 			tl.logEvent("GotConn", connInfo)
+			flush()
 		},
 
 		PutIdleConn: func(err error) {
@@ -105,11 +106,13 @@ func (tl *Timeline) tracer() *httptrace.ClientTrace {
 
 		WroteRequest: func(i httptrace.WroteRequestInfo) {
 			tl.logEvent("WroteRequest", i)
+			flush()
 		},
 	}
 }
 
 func (tl *Timeline) logEvent(name string, payload interface{}) {
+	// fmt.Printf("%s: %+v\n", name, payload)
 	tl.Events = append(
 		tl.Events,
 		Event{

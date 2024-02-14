@@ -13,8 +13,8 @@ import (
 
 func TestNotify(t *testing.T) {
 	url := "http://example.com"
-	tr := NewSSETransport()
-	go tr.Notify(RoundTripLog{RequestLog: RequestLog{Url: url}})
+	tr := NewSSENotifier()
+	go tr.Notify(RoundTripLog{RequestLog: &RequestLog{Url: url}})
 	msg := <-tr.distributor
 	if !strings.Contains(string(msg), url) {
 		t.Errorf(`Expected msg to contain "%v", got %s`, url, msg)
@@ -43,7 +43,7 @@ func TestSerializeOrDie(t *testing.T) {
 
 func TestServeHTTP(t *testing.T) {
 	t.Run("waiting for the first client", func(t *testing.T) {
-		tr := NewSSETransport()
+		tr := NewSSENotifier()
 		ts := httptest.NewUnstartedServer(tr)
 		defer ts.Close()
 		ctx, cancel := context.WithCancel(context.TODO())
@@ -75,12 +75,12 @@ func TestServeHTTP(t *testing.T) {
 		}
 
 		tr.Init(ctx)
-		tr.Notify(RoundTripLog{RequestLog: RequestLog{Url: "http://example.com"}})
+		tr.Notify(RoundTripLog{RequestLog: &RequestLog{Url: "http://example.com"}})
 	})
 
 	t.Run("flusher not supported", func(t *testing.T) {
 		xx := &x{make(map[string][]string), 0, ""}
-		tr := NewSSETransport()
+		tr := NewSSENotifier()
 		req, _ := http.NewRequest("GET", "http://example.com", nil)
 		tr.ServeHTTP(xx, req)
 		if xx.statusCode != 500 {
