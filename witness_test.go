@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +14,7 @@ import (
 )
 
 // uncomment this for manual testing using frontend inspector client
-//*
+/*
 func TestIntegration(t *testing.T) {
 	client := &http.Client{}
 	DebugClient(client, context.Background())
