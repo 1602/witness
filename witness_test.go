@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,23 +24,30 @@ func TestIntegration(t *testing.T) {
 			m := make(map[string]string)
 			m["version"] = "v42.0.0"
 			err := json.NewEncoder(w).Encode(m)
+			waitRandom(2)
 			if err != nil {
 				fmt.Println(err)
 			}
 		}))
 	defer testServer.Close()
-	api := API{client, "https://api.automationcloud.net"}
-	// api := API{client, testServer.URL}
+	// api := API{client, "https://api.automationcloud.net"}
+	api := API{client, testServer.URL}
 	for i := 0; i < 3; i++ {
 		// for {
 		api.CheckStatus()
+		waitRandom(1)
+		api.SendPostRequest()
 		log.Println("ping")
-		time.Sleep(2 * time.Second)
+		waitRandom(3)
 	}
 
 }
 
 //*/
+
+func waitRandom(seconds float64) {
+	time.Sleep(time.Duration(rand.Float64() * seconds * float64(time.Second)))
+}
 
 type fakeNotifier struct {
 	payload RoundTripLog
@@ -72,12 +80,12 @@ func TestInstrumentClient(t *testing.T) {
 
 		testServer := httptest.NewServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// reqBody, err := ioutil.ReadAll(r.Body)
-				// fmt.Println("inside handler", string(reqBody), err)
+				reqBody, err := ioutil.ReadAll(r.Body)
+				fmt.Println("inside handler", string(reqBody), err)
 
 				m := make(map[string]string)
 				m["version"] = "v42.0.0"
-				err := json.NewEncoder(w).Encode(m)
+				err = json.NewEncoder(w).Encode(m)
 				if err != nil {
 					fmt.Println("encode error", err)
 				}
@@ -91,16 +99,16 @@ func TestInstrumentClient(t *testing.T) {
 
 		reqBody := "hello"
 		if payload.RequestLog.Body != reqBody {
-			t.Errorf("Expected request body to be %v, got %v", reqBody, payload.RequestLog.Body)
+			t.Errorf("Expected request body to be '%v', got '%v'", reqBody, payload.RequestLog.Body)
 		}
 
 		respBody := "{\"version\":\"v42.0.0\"}\n"
 		if payload.ResponseLog.Body != respBody {
-			t.Errorf("Expected response body to be %v, got %v", respBody, payload.ResponseLog.Body)
+			t.Errorf("Expected response body to be '%v', got '%v'", respBody, payload.ResponseLog.Body)
 		}
 
 		if payload.RequestLog.Method != "POST" {
-			t.Errorf("Expected request method to be %v, got %v", "POST", payload.RequestLog.Method)
+			t.Errorf("Expected request method to be '%v', got '%v'", "POST", payload.RequestLog.Method)
 		}
 	})
 

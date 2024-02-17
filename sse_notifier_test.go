@@ -1,9 +1,9 @@
 package witness
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -43,22 +43,31 @@ func TestSerializeOrDie(t *testing.T) {
 
 func TestServeHTTP(t *testing.T) {
 	t.Run("waiting for the first client", func(t *testing.T) {
+		// create sse notifier - an http handler for streaming server
 		tr := NewSSENotifier()
-		ts := httptest.NewUnstartedServer(tr)
-		defer ts.Close()
+		// start streaming server (mock of sse server)
+		sse := httptest.NewUnstartedServer(tr)
+		defer sse.Close()
 		ctx, cancel := context.WithCancel(context.TODO())
+
+		// override startServer function to start our replacement test server
+		// instead of the real one
 		tr.startServer = func() {
-			ts.Start()
+			sse.Start()
 
 			go func() {
-				req, _ := http.NewRequest("GET", ts.URL, nil)
-				fmt.Println("server url is", ts.URL)
-				client := &http.Client{Timeout: 10 * time.Millisecond}
+				req, _ := http.NewRequest("GET", sse.URL, nil)
+				client := &http.Client{Timeout: 10 * time.Second}
 				res, err := client.Do(req)
 				if err != nil {
 					fmt.Println(res, err)
 				}
-				l, _ := ioutil.ReadAll(res.Body)
+
+				reader := bufio.NewReader(res.Body)
+				// sse is a streaming server so we have to read line by line
+				// just one line is enough here, because we only going to log one-1
+				l, _ := reader.ReadBytes('\n')
+
 				res.Body.Close()
 				result := string(l)
 
@@ -75,6 +84,7 @@ func TestServeHTTP(t *testing.T) {
 		}
 
 		tr.Init(ctx)
+		// this will cause sse to send one line to its connected client(s)
 		tr.Notify(RoundTripLog{RequestLog: &RequestLog{Url: "http://example.com"}})
 	})
 

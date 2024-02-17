@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 type sse struct {
@@ -53,9 +54,9 @@ func (t *sse) Init(ctx context.Context) {
 	go t.route()
 	go t.startServer()
 
-	// TODO: make configurable
 	// wait until first client connected
-	fmt.Println("waiting for the first client")
+	// TODO: make waiting configurable
+	fmt.Println("waiting for the first client to connect to localhost:8989 events streaming server")
 
 	<-t.firstClient
 
@@ -98,7 +99,8 @@ func (t *sse) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for {
 		select {
 		case data := <-ch:
-			fmt.Printf("sending %d bytes of data\n", len(data))
+			t := time.Now()
+			fmt.Printf("%s sending %d bytes of data\n", t.Format("2006/01/02 15:04:05"), len(data))
 			fmt.Fprintf(rw, "data: %s\n\n", data)
 			flusher.Flush()
 		case <-t.ctx.Done():

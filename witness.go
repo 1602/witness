@@ -100,7 +100,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				},
 				onClose: func(bw *bodyWrapper) {
 					timeline.logEvent("RequestBodyClosed", nil)
-					requestBody = string(bw.content)
+					requestLog.Body = string(bw.content)
 				},
 			}
 		}
