@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
 
 type sse struct {
@@ -40,7 +41,7 @@ func NewSSENotifier() (transport *sse) {
 		closingClients:       make(chan chan []byte),
 		firstClientConnected: false,
 		startServer: func() {
-			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:1602", transport))
+			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:8989", transport))
 		},
 	}
 
@@ -53,9 +54,9 @@ func (t *sse) Init(ctx context.Context) {
 	go t.route()
 	go t.startServer()
 
-	// TODO: make configurable
 	// wait until first client connected
-	fmt.Println("waiting for first client")
+	// TODO: make waiting configurable
+	fmt.Println("waiting for the first client to connect to localhost:8989 events streaming server")
 
 	<-t.firstClient
 
@@ -98,6 +99,8 @@ func (t *sse) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for {
 		select {
 		case data := <-ch:
+			t := time.Now()
+			fmt.Printf("%s sending %d bytes of data\n", t.Format("2006/01/02 15:04:05"), len(data))
 			fmt.Fprintf(rw, "data: %s\n\n", data)
 			flusher.Flush()
 		case <-t.ctx.Done():
@@ -110,6 +113,7 @@ func (t *sse) route() {
 	for {
 		select {
 		case s := <-t.openingClients:
+			fmt.Println("new client connected")
 			t.connectedClients[s] = true
 		case event := <-t.distributor:
 			for c := range t.connectedClients {

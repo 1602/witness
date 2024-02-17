@@ -11,7 +11,7 @@ import (
 func TestTimeline(t *testing.T) {
 	t.Run("event names", func(t *testing.T) {
 		tl := newTimeline(time.Now())
-		tr := tl.tracer()
+		tr := tl.tracer(func() {})
 		cases := map[string]func(){
 			"Got100Continue":    func() { tr.Got100Continue() },
 			"Got1xxResponse":    func() { tr.Got1xxResponse(0, textproto.MIMEHeader{}) },
