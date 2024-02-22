@@ -5,7 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -14,7 +15,7 @@ import (
 )
 
 // uncomment this for manual testing using frontend inspector client
-/*
+// *
 func TestIntegration(t *testing.T) {
 	client := &http.Client{}
 	DebugClient(client, context.Background())
@@ -79,7 +80,7 @@ func TestInstrumentClient(t *testing.T) {
 
 		testServer := httptest.NewServer(
 			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				reqBody, err := ioutil.ReadAll(r.Body)
+				reqBody, err := io.ReadAll(r.Body)
 				fmt.Println("inside handler", string(reqBody), err)
 
 				m := make(map[string]string)
@@ -157,7 +158,7 @@ func (api *API) SendPostRequest() ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func (api *API) CheckStatus() ([]byte, error) {
@@ -171,6 +172,6 @@ func (api *API) CheckStatus() ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	return body, err
 }
