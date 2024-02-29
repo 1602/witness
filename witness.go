@@ -114,6 +114,7 @@ func InstrumentClient(client *http.Client, n Notifier, includeBody bool) {
 				Header:        res.Header,
 				ContentLength: res.ContentLength,
 			}
+			n.Notify(*payload)
 		}
 
 		if err != nil {

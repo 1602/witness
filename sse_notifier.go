@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 )
 
 type sse struct {
@@ -99,8 +98,8 @@ func (t *sse) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	for {
 		select {
 		case data := <-ch:
-			t := time.Now()
-			fmt.Printf("%s sending %d bytes of data\n", t.Format("2006/01/02 15:04:05"), len(data))
+			// t := time.Now()
+			// fmt.Printf("%s sending %d bytes of data\n", t.Format("2006/01/02 15:04:05"), len(data))
 			fmt.Fprintf(rw, "data: %s\n\n", data)
 			flusher.Flush()
 		case <-t.ctx.Done():
