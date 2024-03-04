@@ -2,6 +2,7 @@ package witness
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -32,6 +33,9 @@ func serializeOrDie(stuff interface{}) []byte {
 	return json
 }
 
+//go:embed ui/*
+var content embed.FS
+
 func NewSSENotifier() (transport *sse) {
 	transport = &sse{
 		distributor:          make(chan []byte),
@@ -40,7 +44,10 @@ func NewSSENotifier() (transport *sse) {
 		closingClients:       make(chan chan []byte),
 		firstClientConnected: false,
 		startServer: func() {
-			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:8989", transport))
+			mux := http.NewServeMux()
+			mux.Handle("/", http.FileServer(http.FS(content)))
+			mux.Handle("/events", transport)
+			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:8989", mux))
 		},
 	}
 

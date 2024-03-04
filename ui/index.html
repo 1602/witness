@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="index.js"></script>
+        <style>
+
+body {
+    font-family: monospace;
+    font-size: 12px;
+    color: #dbdbdb;
+    background: #333;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+.header {
+    padding: 5px;
+}
+
+.logs {
+    /* border: red 1px solid; */
+    overflow: auto;
+}
+
+.divider {
+    background: grey;
+    height: 10px;
+    cursor: ns-resize;
+}
+
+.details {
+    /* border: orange 1px solid; */
+}
+
+.json {
+    max-height: 300px;
+    overflow: auto;
+}
+
+.row {
+    border-bottom: grey 1px solid;
+    padding: 10px;
+    position: relative;
+}
+
+.waterfall {
+    position: absolute;
+    height: 3px;
+    bottom: 0;
+    min-width: 3px;
+    background: #34ff00;
+}
+
+.error .row {
+    color: #ff5655;
+}
+
+.status_4xx {
+    color: orange;
+}
+
+.status_5xx {
+    color: red;
+}
+
+.status_2xx {
+    color: green;
+}
+        </style>
+    </head>
+    <body>
+    </body>
+</html>
