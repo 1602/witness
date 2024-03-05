@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type sse struct {
@@ -33,7 +34,7 @@ func serializeOrDie(stuff interface{}) []byte {
 	return json
 }
 
-//go:embed ui/*
+//go:embed ui
 var content embed.FS
 
 func NewSSENotifier() (transport *sse) {
@@ -45,13 +46,27 @@ func NewSSENotifier() (transport *sse) {
 		firstClientConnected: false,
 		startServer: func() {
 			mux := http.NewServeMux()
-			mux.Handle("/", http.FileServer(http.FS(content)))
 			mux.Handle("/events", transport)
+			mux.Handle("/", rootPath("/ui", http.FileServer(http.FS(content))))
 			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:8989", mux))
 		},
 	}
 
 	return transport
+}
+
+func rootPath(staticDir string, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			r.URL.Path = fmt.Sprintf("/%s/", staticDir)
+		} else {
+			b := strings.Split(r.URL.Path, "/")[0]
+			if b != staticDir {
+				r.URL.Path = fmt.Sprintf("/%s%s", staticDir, r.URL.Path)
+			}
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 func (t *sse) Init(ctx context.Context) {
@@ -62,7 +77,7 @@ func (t *sse) Init(ctx context.Context) {
 
 	// wait until first client connected
 	// TODO: make waiting configurable
-	fmt.Println("waiting for the first client to connect to localhost:8989 events streaming server")
+	fmt.Println("waiting for the first client to connect to http://localhost:8989/ events streaming server")
 
 	<-t.firstClient
 

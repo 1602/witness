@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -17,6 +18,9 @@ import (
 // uncomment this for manual testing using frontend inspector client
 // *
 func TestIntegration(t *testing.T) {
+	if os.Getenv("IN_ACTION") == "" {
+		return
+	}
 	client := &http.Client{}
 	DebugClient(client, context.Background())
 	testServer := httptest.NewServer(
