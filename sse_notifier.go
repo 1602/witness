@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -47,7 +50,14 @@ func NewSSENotifier() (transport *sse) {
 		startServer: func() {
 			mux := http.NewServeMux()
 			mux.Handle("/events", transport)
-			mux.Handle("/", rootPath("/ui", http.FileServer(http.FS(content))))
+			if os.Getenv("DEV_MODE") != "" {
+				_, b, _, _ := runtime.Caller(0)
+				path := fmt.Sprintf("%s/ui", filepath.Dir(b))
+				// fmt.Println("Here", path)
+				mux.Handle("/", http.FileServer(http.Dir(path)))
+			} else {
+				mux.Handle("/", rootPath("/ui", http.FileServer(http.FS(content))))
+			}
 			log.Fatal("HTTP server error: ", http.ListenAndServe("localhost:8989", mux))
 		},
 	}
