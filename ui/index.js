@@ -2,6 +2,7 @@ let connection;
 let openRequests = new Map();
 let connected;
 let reconnectingTimeout = null;
+let activeLog = null;
 
 function connect() {
     if (reconnectingTimeout) {
@@ -99,7 +100,7 @@ function init() {
 
     // debug
     if (localStorage.lastMessage) {
-        // handle(JSON.parse(localStorage.lastMessage));
+        handle(JSON.parse(localStorage.lastMessage));
     }
 
     connect();
@@ -193,9 +194,19 @@ function render(log) {
 
     log.el.innerHTML = `<div class="row">${req.method} ${req.url} ${ status(res) } ${ res ? formatByteLen(res.contentLength) : '' } ${ duration } ${ error ? error.message : '' }<span class="waterfall"></span></div>`;
 
-    log.el.firstChild.addEventListener('click', () => {
+    log.el.firstChild.addEventListener('mousedown', () => {
+        makeActive(log.el);
         details.innerHTML = `<div> ${ expanded(log) }</div>`;
     });
+}
+
+function makeActive(el) {
+    if (activeLog) {
+        activeLog.classList.remove('active-log');
+    }
+    el.classList.add('active-log');
+    activeLog = el;
+    console.log(el);
 }
 
 function status(res) {
