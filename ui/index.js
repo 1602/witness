@@ -3,6 +3,7 @@ let openRequests = new Map();
 let connected;
 let reconnectingTimeout = null;
 let activeLog = null;
+let logByEl = new Map();
 
 function connect() {
     if (reconnectingTimeout) {
@@ -103,6 +104,21 @@ function init() {
         handle(JSON.parse(localStorage.lastMessage));
     }
 
+    document.addEventListener('keydown', (e) => {
+        switch (e.code) {
+            case 'KeyJ':
+                if (activeLog && activeLog.nextSibling) {
+                    activate(logByEl.get(activeLog.nextSibling));
+                }
+                break;
+            case 'KeyK':
+                if (activeLog && activeLog.previousSibling) {
+                    activate(logByEl.get(activeLog.previousSibling));
+                }
+                break;
+        }
+    });
+
     connect();
 }
 
@@ -115,7 +131,6 @@ function updateConnected(newValue) {
 }
 
 function handle(data) {
-    console.log(data);
     logRequest(data);
 }
 
@@ -137,6 +152,7 @@ function logRequest(rt) {
         }
         log = { el, rt };
         openRequests.set(id, log);
+        logByEl.set(el, log);
         app.appendChild(el);
         el.sourceData = rt;
 
@@ -195,9 +211,13 @@ function render(log) {
     log.el.innerHTML = `<div class="row">${req.method} ${req.url} ${ status(res) } ${ res ? formatByteLen(res.contentLength) : '' } ${ duration } ${ error ? error.message : '' }<span class="waterfall"></span></div>`;
 
     log.el.firstChild.addEventListener('mousedown', () => {
-        makeActive(log.el);
-        details.innerHTML = `<div> ${ expanded(log) }</div>`;
+        activate(log);
     });
+}
+
+function activate(log) {
+    makeActive(log.el);
+    details.innerHTML = `<div> ${ expanded(log) }</div>`;
 }
 
 function makeActive(el) {
@@ -206,7 +226,6 @@ function makeActive(el) {
     }
     el.classList.add('active-log');
     activeLog = el;
-    console.log(el);
 }
 
 function status(res) {
@@ -224,9 +243,11 @@ function expanded(log) {
         requestLog: req,
         responseLog: res,
         error,
+        id,
     } = log.rt;
 
-    const body = res && res.body ?
+    let body = `reqid: ${id}`;
+    body += res && res.body ?
         `response body: <pre class="json"> ${ JSON.stringify(JSON.parse(res.body), ' ', 4) } </pre>` : '';
 
     const err = error ? `error details: <pre>${ JSON.stringify(error.details, ' ', 4) }</pre>` : '';
